@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BOM Manager - Walmart Sourcing</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'walmart-blue': {
+                            10: '#e5f0ff',
+                            50: '#99c2ff',
+                            100: '#0053e2',
+                            110: '#0046c2',
+                            130: '#003699',
+                            160: '#001f5c'
+                        },
+                        'walmart-spark': {
+                            10: '#fff8e5',
+                            50: '#ffe699',
+                            100: '#ffc220',
+                            140: '#995213'
+                        },
+                        'walmart-green': {
+                            10: '#e8f5e3',
+                            100: '#2a8703'
+                        },
+                        'walmart-red': {
+                            10: '#ffebe8',
+                            100: '#ea1100'
+                        },
+                        'walmart-gray': {
+                            10: '#f5f5f5',
+                            50: '#cccccc',
+                            100: '#888888',
+                            160: '#333333'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .spark-gradient {
+            background: linear-gradient(135deg, #0053e2 0%, #003699 100%);
+        }
+        .table-header {
+            background: linear-gradient(135deg, #0053e2 0%, #0046c2 100%);
+        }
+        .section-header {
+            background: linear-gradient(135deg, #ffc220 0%, #ffdb70 100%);
+        }
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #0053e2;
+            box-shadow: 0 0 0 3px rgba(0, 83, 226, 0.2);
+        }
+        .btn-primary {
+            transition: all 0.2s ease;
+        }
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 83, 226, 0.3);
+        }
+        .animate-fade-in {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .image-preview {
+            max-width: 200px;
+            max-height: 200px;
+            object-fit: contain;
+        }
+        .level-badge {
+            transition: all 0.2s ease;
+        }
+        .level-badge.selected {
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body class="bg-walmart-gray-10 min-h-screen">
+    <!-- Header -->
+    <header class="spark-gradient text-white shadow-lg">
+        <div class="container mx-auto px-6 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-4">
+                    <div class="w-10 h-10 bg-walmart-spark-100 rounded-full flex items-center justify-center">
+                        <svg class="w-6 h-6 text-walmart-blue-100" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h1 class="text-2xl font-bold">Bill of Materials Manager</h1>
+                        <p class="text-walmart-blue-10 text-xs">物料清单管理</p>
+                        <p class="text-walmart-blue-10 text-sm">Walmart Sourcing · 沃尔玛采购</p>
+                    </div>
+                </div>
+                <div class="flex gap-3">
+                    <button onclick="exportToExcel()" class="btn-primary bg-walmart-spark-100 text-walmart-gray-160 px-5 py-2 rounded-lg font-semibold flex items-center gap-2 hover:bg-walmart-spark-50">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                        <div class="text-left">
+                            <div>Export Excel</div>
+                            <div class="text-xs font-normal">导出Excel</div>
+                        </div>
+                    </button>
+                    <button onclick="emailBOM()" class="btn-primary bg-white text-walmart-blue-100 px-5 py-2 rounded-lg font-semibold flex items-center gap-2 hover:bg-walmart-blue-10">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                        </svg>
+                        <div class="text-left">
+                            <div>Email BOM</div>
+                            <div class="text-xs font-normal">发送物料清单</div>
+                        </div>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="container mx-auto px-6 py-8">
+        <!-- BOM Header Info - Row 1 -->
+        <section class="bg-white rounded-xl shadow-md p-6 mb-6 animate-fade-in">
+            <h2 class="text-lg font-bold text-walmart-gray-160 mb-4 flex items-center gap-2">
+                <span class="w-2 h-6 bg-walmart-spark-100 rounded"></span>
+                <div>
+                    <div>BOM Header Information</div>
+                    <div class="text-xs font-normal text-walmart-gray-100">物料清单头部信息</div>
+                </div>
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div>
+                    <label for="bomDate" class="block text-sm font-medium text-walmart-gray-160 mb-2">Date <span class="text-xs font-normal text-walmart-gray-100">日期</span></label>
+                    <input type="date" id="bomDate" class="w-full px-4 py-2.5 border border-walmart-gray-50 rounded-lg text-walmart-gray-160">
+                </div>
+                <div>
+                    <label for="supplierName" class="block text-sm font-medium text-walmart-gray-160 mb-2">Supplier Name <span class="text-xs font-normal text-walmart-gray-100">供应商名称</span></label>
+                    <input type="text" id="supplierName" placeholder="Enter supplier name" class="w-full px-4 py-2.5 border border-walmart-gray-50 rounded-lg text-walmart-gray-160">
+                </div>
+                <div>
+                    <label for="productDescription" class="block text-sm font-medium text-walmart-gray-160 mb-2">Product Description <span class="text-xs font-normal text-walmart-gray-100">产品描述</span></label>
+                    <input type="text" id="productDescription" placeholder="Enter product description" class="w-full px-4 py-2.5 border border-walmart-gray-50 rounded-lg text-walmart-gray-160">
+                </div>
+                <div>
+                    <label for="departmentNumber" class="block text-sm font-medium text-walmart-gray-160 mb-2">Department # <span class="text-xs font-normal text-walmart-gray-100">部门号</span></label>
+                    <select id="departmentNumber" onchange="updateCategories()" class="w-full px-4 py-2.5 border border-walmart-gray-50 rounded-lg text-walmart-gray-160 bg-white">
+                        <option value="">Select Department...</option>
+                        <option value="16">16 - Lawn & Garden</option>
+                        <option value="56">56 - Outdoor Living</option>
+                    </select>
+                </div>
+            </div>
+        </section>
+
+        <!-- BOM Header Info - Row 2 -->
+        <section class="bg-white rounded-xl shadow-md p-6 mb-6 animate-fade-in">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div>
+                    <label for="category" class="block text-sm font-medium text-walmart-gray-160 mb-2">Category <span class="text-xs font-normal text-walmart-gray-100">类别</span></label>
+                    <select id="category" class="w-full px-4 py-2.5 border border-walmart-gray-50 rounded-lg text-walmart-gray-160 bg-white">
+                        <option value="">Select Department First...</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="currency" class="block text-sm font-medium text-walmart-gray-160 mb-2">Currency <span class="text-xs font-normal text-walmart-gray-100">货币</span></label>
+                    <select id="currency" onchange="updateExchangeRate()" class="w-full px-4 py-2.5 border border-walmart-gray-50 rounded-lg text-walmart-gray-160 bg-white">
+                        <option value="USD" data-rate="1">USD - US Dollar</option>
+                        <option value="CNY" data-rate="7.25">CNY - Chinese Yuan (RMB)</option>
+                        <option value="INR" data-rate="83.12">INR - Indian Rupee</option>
+                        <option value="VND" data-rate="24500">VND - Vietnamese Dong</option>
+                        <option value="KHR" data-rate="4100">KHR - Cambodian Riel</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="exchangeRate" class="block text-sm font-medium text-walmart-gray-160 mb-2">Exchange Rate (to USD) <span class="text-xs font-normal text-walmart-gray-100">汇率</span></label>
+                    <input type="number" id="exchangeRate" step="0.01" value="1" class="w-full px-4 py-2.5 border border-walmart-gray-50 rounded-lg text-walmart-gray-160">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-walmart-gray-160 mb-2">Level Selection <span class="text-xs font-normal text-walmart-gray-100">级别选择</span></label>
+                    <div class="flex gap-2">
+                        <label class="level-badge flex-1 cursor-pointer">
+                            <input type="radio" name="levelSelection" id="levelL2" value="L2" class="hidden peer">
+                            <div class="peer-checked:bg-walmart-blue-100 peer-checked:text-white peer-checked:border-walmart-blue-100 px-4 py-2 border-2 border-walmart-gray-50 rounded-lg text-center font-semibold text-walmart-gray-160 hover:border-walmart-blue-100 transition-colors">
+                                L2
+                            </div>
+                        </label>
+                        <label class="level-badge flex-1 cursor-pointer">
+                            <input type="radio" name="levelSelection" id="levelL3" value="L3" class="hidden peer">
+                            <div class="peer-checked:bg-walmart-blue-100 peer-checked:text-white peer-checked:border-walmart-blue-100 px-4 py-2 border-2 border-walmart-gray-50 rounded-lg text-center font-semibold text-walmart-gray-160 hover:border-walmart-blue-100 transition-colors">
+                                L3
+                            </div>
+                        </label>
+                        <label class="level-badge flex-1 cursor-pointer">
+                            <input type="radio" name="levelSelection" id="levelL4" value="L4" class="hidden peer">
+                            <div class="peer-checked:bg-walmart-blue-100 peer-checked:text-white peer-checked:border-walmart-blue-100 px-4 py-2 border-2 border-walmart-gray-50 rounded-lg text-center font-semibold text-walmart-gray-160 hover:border-walmart-blue-100 transition-colors">
+                                L4
+                            </div>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Product Image Upload -->
+        <section class="bg-white rounded-xl shadow-md p-6 mb-6 animate-fade-in">
+            <h2 class="text-lg font-bold text-walmart-gray-160 mb-4 flex items-center gap-2">
+                <span class="w-2 h-6 bg-walmart-green-100 rounded"></span>
+                <div>
+                    <div>Product Image</div>
+                    <div class="text-xs font-normal text-walmart-gray-100">产品图片</div>
+                </div>
+            </h2>
+            <div class="flex items-start gap-6">
+                <div class="flex-1">
+                    <label for="productImage" class="block text-sm font-medium text-walmart-gray-160 mb-2">Upload Product Image <span class="text-xs font-normal text-walmart-gray-100">上传产品图片</span></label>
+                    <div class="flex items-center gap-4">
+                        <label class="cursor-pointer">
+                            <input type="file" id="productImage" accept="image/*" onchange="previewImage(event)" class="hidden">
+                            <div class="px-6 py-3 bg-walmart-blue-10 border-2 border-dashed border-walmart-blue-100 rounded-lg text-walmart-blue-100 font-medium hover:bg-walmart-blue-100 hover:text-white transition-colors flex items-center gap-2">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                </svg>
+                                Choose Image
+                            </div>
+                        </label>
+                        <button onclick="clearImage()" class="px-4 py-2 text-walmart-red-100 hover:bg-walmart-red-10 rounded-lg font-medium transition-colors">
+                            Clear
+                        </button>
+                    </div>
+                    <p class="text-xs text-walmart-gray-100 mt-2">Supported formats: JPG, PNG, GIF (Max 5MB)</p>
+                </div>
+                <div id="imagePreviewContainer" class="hidden">
+                    <div class="border-2 border-walmart-gray-50 rounded-lg p-2 bg-white">
+                        <img id="imagePreview" class="image-preview rounded" alt="Product preview">
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 1: Part / Component -->
+        <section class="bg-white rounded-xl shadow-md overflow-hidden animate-fade-in mb-6">
+            <div class="section-header px-6 py-3">
+                <h2 class="text-lg font-bold text-walmart-gray-160 flex items-center gap-2">
+                    <span class="w-8 h-8 bg-walmart-blue-100 rounded-full flex items-center justify-center text-white text-sm">A</span>
+                    <div>
+                        <div>Part / Component</div>
+                        <div class="text-xs font-normal text-walmart-gray-100">零件 / 组件</div>
+                    </div>
+                </h2>
+            </div>
+            <div class="p-4 border-b border-walmart-gray-50 flex justify-end">
+                <button onclick="addRow('partComponent')" class="btn-primary bg-walmart-green-100 text-white px-4 py-2 rounded-lg font-semibold flex items-center gap-2 hover:opacity-90">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                    </svg>
+                    <div class="text-left">
+                        <div>Add Row</div>
+                        <div class="text-xs font-normal">添加行</div>
+                    </div>
+                </button>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="table-header text-white">
+                        <tr>
+                            <th class="px-3 py-3 text-left font-semibold w-12">#</th>
+                            <th class="px-3 py-3 text-left font-semibold min-w-[150px]"><div>Parts/Components</div><div class="text-xs font-normal opacity-80">零件/组件</div></th>
+                            <th class="px-3 py-3 text-left font-semibold min-w-[140px]"><div>Commodity Materials</div><div class="text-xs font-normal opacity-80">商品材料</div></th>
+                            <th class="px-3 py-3 text-left font-semibold min-w-[150px]"><div>Key Spec</div><div class="text-xs font-normal opacity-80">关键规格</div></th>
+                            <th class="px-3 py-3 text-left font-semibold min-w-[120px]"><div>Brand</div><div class="text-xs font-normal opacity-80">品牌</div></th>
+                            <th class="px-3 py-3 text-left font-semibold min-w-[100px]"><div>Model #</div><div class="text-xs font-normal opacity-80">型号</div></th>
+                            <th class="px-3 py-3 text-left font-semibold min-w-[130px]"><div>Upstream Supplier</div><div class="text-xs font-normal opacity-80">上游供应商</div></th>
+                            <th class="px-3 py-3 text-left font-semibold min-w-[120px]"><div>Country of Origin</div><div class="text-xs font-normal opacity-80">原产国</div></th>
+                            <th class="px-3 py-3 text-left font-semibold min-w-[80px]"><div>Usage (QTY)</div><div class="text-xs font-normal opacity-80">用量</div></th>
+                            <th class="px-3 py-3 text-left font-semibold min-w-[80px]"><div>Unit</div><div class="text-xs font-normal opacity-80">单位</div></th>
+                            <th class="px-3 py-3 text-left font-semibold min-w-[100px]"><div>Unit Cost</div><div class="text-xs font-normal opacity-80">单价</div></th>
+                            <th class="px-3 py-3 text-left font-semibold min-w-[100px]"><div>Extended Cost</div><div class="text-xs font-normal opacity-80">总价</div></th>
+                            <th class="px-3 py-3 text-left font-semibold min-w-[120px]"><div>Remark</div><div class="text-xs font-normal opacity-80">备注</div></th>
+                            <th class="px-3 py-3 text-left font-semibold w-16"><div>Actions</div><div class="text-xs font-normal opacity-80">操作</div></th>
+                        </tr>
+                    </thead>
+                    <tbody id="partComponentBody" class="divide-y divide-walmart-gray-50">
+                    </tbody>
+                </table>
+            </div>
+            <div class="p-4 bg-walmart-gray-10 border-t border-walmart-gray-50">
+                <div class="flex justify-end items-center gap-4">
+                    <span class="font-semibold text-walmart-gray-160">Section Subtotal: <span class="text-xs font-normal text-walmart-gray-100">分项小计</span></span>
+                    <span id="partComponentTotal" class="text-xl font-bold text-walmart-blue-100">$0.00</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 2: Packaging / Labeling -->
+        <section class="bg-white rounded-xl shadow-md overflow-hidden animate-fade-in mb-6">
+            <div class="section-header px-6 py-3">
+                <h2 class="text-lg font-bold text-walmart-gray-160 flex items-center gap-2">
+                    <span class="w-8 h-8 bg-walmart-blue-100 rounded-full flex items-center justify-center text-white text-sm">B</span>
+                    <div>
+                        <div>Packaging / Labeling</div>
+                        <div class="text-xs font-normal text-walmart-gray-100">包装 / 标签</div>
+                    </div>
+                </h2>
+            </div>
+            <div class="p-4 border-b border-walmart-gray-50 flex justify-end">
+                <button onclick="addRow('packagingLabeling')" class="btn-primary bg-walmart-green-100 text-white px-4 py-2 rounded-lg font-semibold flex items-center gap-2 hover:opacity-90">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                    </svg>
+                    <div class="text-left">
+                        <div>Add Row</div>
+                        <div class="text-xs font-normal">添加行</div>
+                    </div>
+                </button>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="table-header text-white">
+                        <tr>
+                            <th class="px-3 py-3 text-left font-semibold w-12">#</th>
+                            <th class="px-3 py-3 text-left font-semibold min-w-[150px]"><div>Parts/Components</div><div class="text-xs font-normal opacity-80">零件/组件</div></th>
+                            <th class="px-3 py-3 text-left font-semibold min-w-[140px]"><div>Commodity Materials</div><div class="text-xs font-normal opacity-80">商品材料</div></th>
+                            <th class="px-3 py-3 text-left font-semibold min-w-[150px]"><div>Key Spec</div><div class="text-xs font-normal opacity-80">关键规格</div></th>
+                            <th class="px-3 py-3 text-left font-semibold min-w-[120px]"><div>Brand</div><div class="text-xs font-normal opacity-80">品牌</div></th>
+                            <th class="px-3 py-3 text-left font-semibold min-w-[100px]"><div>Model #</div><div class="text-xs font-normal opacity-80">型号</div></th>
+                            <th class="px-3 py-3 text-left font-semibold min-w-[130px]"><div>Upstream Supplier</div><div class="text-xs font-normal opacity-80">上游供应商</div></th>
+                            <th class="px-3 py-3 text-left font-semibold min-w-[120px]"><div>Country of Origin</div><div class="text-xs font-normal opacity-80">原产国</div></th>
+                            <th class="px-3 py-3 text-left font-semibold min-w-[80px]"><div>Usage (QTY)</div><div class="text-xs font-normal opacity-80">用量</div></th>
+                            <th class="px-3 py-3 text-left font-semibold min-w-[80px]"><div>Unit</div><div class="text-xs font-normal opacity-80">单位</div></th>
+                            <th class="px-3 py-3 text-left font-semibold min-w-[100px]"><div>Unit Cost</div><div class="text-xs font-normal opacity-80">单价</div></th>
+                            <th class="px-3 py-3 text-left font-semibold min-w-[100px]"><div>Extended Cost</div><div class="text-xs font-normal opacity-80">总价</div></th>
+                            <th class="px-3 py-3 text-left font-semibold min-w-[120px]"><div>Remark</div><div class="text-xs font-normal opacity-80">备注</div></th>
+                            <th class="px-3 py-3 text-left font-semibold w-16"><div>Actions</div><div class="text-xs font-normal opacity-80">操作</div></th>
+                        </tr>
+                    </thead>
+                    <tbody id="packagingLabelingBody" class="divide-y divide-walmart-gray-50">
+                    </tbody>
+                </table>
+            </div>
+            <div class="p-4 bg-walmart-gray-10 border-t border-walmart-gray-50">
+                <div class="flex justify-end items-center gap-4">
+                    <span class="font-semibold text-walmart-gray-160">Section Subtotal: <span class="text-xs font-normal text-walmart-gray-100">分项小计</span></span>
+                    <span id="packagingLabelingTotal" class="text-xl font-bold text-walmart-blue-100">$0.00</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 3: Overheads and Other Costs -->
+        <section class="bg-white rounded-xl shadow-md overflow-hidden animate-fade-in mb-6">
+            <div class="section-header px-6 py-3">
+                <h2 class="text-lg font-bold text-walmart-gray-160 flex items-center gap-2">
+                    <span class="w-8 h-8 bg-walmart-blue-100 rounded-full flex items-center justify-center text-white text-sm">C</span>
+                    <div>
+                        <div>Overheads and Other Costs</div>
+                        <div class="text-xs font-normal text-walmart-gray-100">管理费用及其他成本</div>
+                    </div>
+                </h2>
+            </div>
+            <div class="p-4 border-b border-walmart-gray-50 flex justify-end">
+                <button onclick="addRow('overheadsCosts')" class="btn-primary bg-walmart-green-100 text-white px-4 py-2 rounded-lg font-semibold flex items-center gap-2 hover:opacity-90">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                    </svg>
+                    <div class="text-left">
+                        <div>Add Row</div>
+                        <div class="text-xs font-normal">添加行</div>
+                    </div>
+                </button>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="table-header text-white">
+                        <tr>
+                            <th class="px-3 py-3 text-left font-semibold w-12">#</th>
+                            <th class="px-3 py-3 text-left font-semibold min-w-[250px]"><div>Cost Item</div><div class="text-xs font-normal opacity-80">成本项目</div></th>
+                            <th class="px-3 py-3 text-left font-semibold min-w-[120px]"><div>Country of Origin</div><div class="text-xs font-normal opacity-80">原产国</div></th>
+                            <th class="px-3 py-3 text-left font-semibold min-w-[100px]"><div>Usage (QTY)</div><div class="text-xs font-normal opacity-80">用量</div></th>
+                            <th class="px-3 py-3 text-left font-semibold min-w-[100px]"><div>Unit</div><div class="text-xs font-normal opacity-80">单位</div></th>
+                            <th class="px-3 py-3 text-left font-semibold min-w-[120px]"><div>Unit Cost</div><div class="text-xs font-normal opacity-80">单价</div></th>
+                            <th class="px-3 py-3 text-left font-semibold min-w-[200px]"><div>Remark</div><div class="text-xs font-normal opacity-80">备注</div></th>
+                            <th class="px-3 py-3 text-left font-semibold w-16"><div>Actions</div><div class="text-xs font-normal opacity-80">操作</div></th>
+                        </tr>
+                    </thead>
+                    <tbody id="overheadsCostsBody" class="divide-y divide-walmart-gray-50">
+                    </tbody>
+                </table>
+            </div>
+            <div class="p-4 bg-walmart-gray-10 border-t border-walmart-gray-50">
+                <div class="flex justify-end items-center gap-4">
+                    <span class="font-semibold text-walmart-gray-160">Section Subtotal: <span class="text-xs font-normal text-walmart-gray-100">分项小计</span></span>
+                    <span id="overheadsCostsTotal" class="text-xl font-bold text-walmart-blue-100">$0.00</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Grand Total Section -->
+        <section class="bg-walmart-blue-100 rounded-xl shadow-lg p-6 mb-6 animate-fade-in">
+            <div class="flex justify-between items-center">
+                <div class="text-white">
+                    <h3 class="text-xl font-bold">Grand Total (All Sections)</h3>
+                    <p class="text-walmart-blue-10 text-xs">总计（所有部分）</p>
+                    <p class="text-walmart-blue-10 text-sm">Part/Component + Packaging/Labeling + Overheads</p>
+                </div>
+                <div class="text-right">
+                    <span id="grandTotal" class="text-4xl font-bold text-walmart-spark-100">$0.00</span>
+                    <p id="grandTotalConverted" class="text-walmart-blue-10 text-sm mt-1"></p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Quick Actions -->
+        <section class="flex justify-center gap-4">
+            <button onclick="clearAll()" class="px-6 py-3 border-2 border-walmart-red-100 text-walmart-red-100 rounded-lg font-semibold hover:bg-walmart-red-10 transition-colors">
+                <div>Clear All Data</div>
+                <div class="text-xs font-normal">清除所有数据</div>
+            </button>
+            <button onclick="loadSampleData()" class="px-6 py-3 border-2 border-walmart-blue-100 text-walmart-blue-100 rounded-lg font-semibold hover:bg-walmart-blue-10 transition-colors">
+                <div>Load Sample Data</div>
+                <div class="text-xs font-normal">加载示例数据</div>
+            </button>
+        </section>
+    </main>
+
+    <!-- Email Modal -->
+    <div id="emailModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md mx-4 animate-fade-in">
+            <h3 class="text-xl font-bold text-walmart-gray-160 mb-4">
+                <div>Email BOM</div>
+                <div class="text-xs font-normal text-walmart-gray-100">发送物料清单</div>
+            </h3>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-walmart-gray-160 mb-2">Recipient Email <span class="text-xs font-normal text-walmart-gray-100">收件人邮箱</span></label>
+                    <input type="email" id="recipientEmail" placeholder="recipient@walmart.com" class="w-full px-4 py-2.5 border border-walmart-gray-50 rounded-lg">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-walmart-gray-160 mb-2">Subject <span class="text-xs font-normal text-walmart-gray-100">主题</span></label>
+                    <input type="text" id="emailSubject" class="w-full px-4 py-2.5 border border-walmart-gray-50 rounded-lg">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-walmart-gray-160 mb-2">Message <span class="text-xs font-normal text-walmart-gray-100">内容</span></label>
+                    <textarea id="emailMessage" rows="3" class="w-full px-4 py-2.5 border border-walmart-gray-50 rounded-lg"></textarea>
+                </div>
+            </div>
+            <div class="flex justify-end gap-3 mt-6">
+                <button onclick="closeEmailModal()" class="px-4 py-2 border border-walmart-gray-50 text-walmart-gray-160 rounded-lg font-medium hover:bg-walmart-gray-10">
+                    Cancel
+                </button>
+                <button onclick="sendEmail()" class="px-4 py-2 bg-walmart-blue-100 text-white rounded-lg font-medium hover:bg-walmart-blue-110">
+                    Send Email
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="mt-12 py-6 bg-walmart-gray-160 text-white text-center">
+        <p class="text-sm">Walmart Sourcing - Bill of Materials Manager</p>
+        <p class="text-xs text-walmart-gray-100">沃尔玛采购 - 物料清单管理</p>
+        <p class="text-xs text-walmart-gray-100 mt-1">Built with 🐶 by Code Puppy</p>
+    </footer>
+
+    <script src="bom-manager.js"></script>
+</body>
+</html>
